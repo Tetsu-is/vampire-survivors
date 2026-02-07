@@ -1,0 +1,29 @@
+version = 1
+revision = 1
+requires-python = ">=3.12"
+
+[[package]]
+name = "pyxel"
+version = "2.6.3"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3a/8c/f9b84505273fc177b2c415fe43ae621e0f3e1181b5f63a0b69537e8e1096/pyxel-2.6.3-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:47a29306e2d852bfd5bcddeed16594a9c7fbf6b5d5160050eaf6f7191cb78a71", size = 31100038 },
+    { url = "https://files.pythonhosted.org/packages/70/36/fbd96fc96dd9ccd464db31d82b3b327e5dc7ebf5bc65d1ca6ec74f3b34d1/pyxel-2.6.3-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:9a69c34b8f34741ea665c153a16ce51dddae1435b8674d8b51a6c337cd152897", size = 30866787 },
+    { url = "https://files.pythonhosted.org/packages/38/2a/2785b3777d62c0e49c53626cd710b74d100f86cd09a50fe72c021da43645/pyxel-2.6.3-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b5588e1952559003f2d075750baf376932582037edb336af25d9f9cfdaa59514", size = 30727180 },
+    { url = "https://files.pythonhosted.org/packages/aa/74/44e2f7ba0b81aabca7e3f3fda8d0effdef1860ac054f3d727d2f413bad84/pyxel-2.6.3-cp38-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f82a203db98353ebc8340364737d0fab626b4bbcc1bd3e67224a1b624ba8c5cb", size = 30684665 },
+    { url = "https://files.pythonhosted.org/packages/5a/9d/d8555155f712f524282cff58c82ce12ff6f91a0e44e5c759a59c48370452/pyxel-2.6.3-cp38-abi3-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:c071f4df4ec17697f4cc5360ea4ca8bbba28201c521de1e8268240a4814aad18", size = 31283732 },
+    { url = "https://files.pythonhosted.org/packages/d0/f4/5f12f1d0f141a9fc7f50452b6b92a1b0d586d4f569fdebfa1ea50bb7bb0c/pyxel-2.6.3-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:82b079ba574bbe7f9b17a6e034d3c8916fda8668549a2a9427ae4e44f51eeffd", size = 30892807 },
+    { url = "https://files.pythonhosted.org/packages/bd/2c/da6c095883ff8ec7795dc5642bdfb01271bb168f0d607b42aa01a763270c/pyxel-2.6.3-cp38-abi3-win32.whl", hash = "sha256:553feed43f9f50be6937816ddec7b5325feac204af2ded95299541a01da34f07", size = 30663639 },
+    { url = "https://files.pythonhosted.org/packages/94/e4/02a33e90040692de462bbb4063b5a9e3e13ca03d37a1408f2c59c73e9a13/pyxel-2.6.3-cp38-abi3-win_amd64.whl", hash = "sha256:e7fa90eac1d59706420e47d4386c37f70c1e8308959477b38e92ec5d2f45761a", size = 30844932 },
+]
+
+[[package]]
+name = "vampire-survivors-like"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "pyxel" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pyxel", specifier = ">=2.6.3" }]

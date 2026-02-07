@@ -1,0 +1,6 @@
+[project]
+name = "vampire-survivors-like"
+version = "0.1.0"
+dependencies = [
+    "pyxel>=2.6.3",
+]
