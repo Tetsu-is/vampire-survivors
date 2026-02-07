@@ -125,6 +125,15 @@ class SummonGhostAbility(Ability):
         # 最初のゴーストを召喚 (player_x, player_yはプレイヤーの初期位置、BULLET_DAMAGEは現在の弾丸ダメージ)
         player.ghosts.append(Ghost(player.player_x, player.player_y, player.bullet_damage))
 
+class BulletFireRateUp(Ability):
+    def __init__(self):
+        super().__init__(
+            "Bullet Fire Rate Up", "Increases bullet fire rate."
+        )
+
+    def apply_effect(self, player):
+        player.player_fire_rate_multiplier += 0.1 # 発射レートを上げる (0.1は仮の値)
+
 
 # 全てのアビリティのリスト
 ALL_ABILITIES = [
@@ -135,6 +144,7 @@ ALL_ABILITIES = [
     AutoAimBulletAbility(),
     PiercingShotAbility(),
     SummonGhostAbility(), # 新しいアビリティを追加
+    BulletFireRateUp(), # 新しいアビリティを追加
 ]
 
 
@@ -266,6 +276,7 @@ class Enemy:
         self.width = int(8 * size_multiplier)
         self.height = int(8 * size_multiplier)
         self.color = 1 + ((phase - 1) % 14) # pyxelのカラーパレットに合わせて色をサイクルさせる (0は黒なので1から)
+        self.phase = phase
 
     def update(self, player_x, player_y):
         if not self.is_active:
@@ -454,12 +465,18 @@ class App:
         self.has_auto_aim_bullet = False
         self.shot_cooldown_frames = 10  # 1秒間に3発 (30FPSなので 30 / 3 = 10フレーム)
         self.last_shot_frame = -10  # 最初の発射をすぐできるように初期値を設定
+        self.player_fire_rate_multiplier = 1.0 # 発射レートの乗数
         self.current_phase = 1  # 現在のゲームフェーズ
         self.has_piercing_shot = False # 貫通弾アビリティを持っているか
         self.pierce_level = 0 # 貫通レベル (貫通できる敵の数 + 1)
         self.acquired_ability_levels = {} # 取得済みアビリティのレベルを記録する辞書
         self.has_ghost_summon = False # ゴースト召喚アビリティを持っているか
         self.ghosts = [] # 召喚されたゴーストオブジェクトを保持するリスト
+
+        # 移動しっぱなしモード関連
+        self.is_continuous_move_mode_on = False # 移動しっぱなしモードのオン/オフ
+        self.continuous_move_dx = 0 # 移動しっぱなしモード時のX方向移動量
+        self.continuous_move_dy = 0 # 移動しっぱなしモード時のY方向移動量
 
         # デバッグ用アビリティの適用
         for debug_ability_name in self.debug_abilities:
@@ -487,22 +504,62 @@ class App:
 
     def update(self):
         if self.game_state == GAME_STATE_PLAYING:
+            # LShiftキーで移動しっぱなしモードをトグル
+            if pyxel.btnp(pyxel.KEY_LSHIFT):
+                self.is_continuous_move_mode_on = not self.is_continuous_move_mode_on
+                # モードがオフになったら、継続移動を停止
+                if not self.is_continuous_move_mode_on:
+                    self.continuous_move_dx = 0
+                    self.continuous_move_dy = 0
+
             # プレイヤーの移動処理
-            if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
-                self.player_x -= self.player_speed
-            if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
-                self.player_x += self.player_speed
-            if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.KEY_W):
-                self.player_y -= self.player_speed
-            if pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.KEY_S):
-                self.player_y += self.player_speed
+            if self.is_continuous_move_mode_on:
+                # 継続移動モードがオンの場合
+                input_dx = 0
+                input_dy = 0
+                if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
+                    input_dx -= 1
+                if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
+                    input_dx += 1
+                if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.KEY_W):
+                    input_dy -= 1
+                if pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.KEY_S):
+                    input_dy += 1
+
+                # 新しい方向入力があれば、継続移動の方向を更新
+                if input_dx != 0 or input_dy != 0:
+                    self.continuous_move_dx = input_dx
+                    self.continuous_move_dy = input_dy
+                
+                # 継続移動を実行
+                self.player_x += self.continuous_move_dx * self.player_speed
+                self.player_y += self.continuous_move_dy * self.player_speed
+
+            else:
+                # 継続移動モードがオフの場合（通常の移動）
+                if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
+                    self.player_x -= self.player_speed
+                if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
+                    self.player_x += self.player_speed
+                if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.KEY_W):
+                    self.player_y -= self.player_speed
+                if pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.KEY_S):
+                    self.player_y += self.player_speed
+
             self.player_x = max(0, min(self.player_x, SCREEN_WIDTH - self.player_width))
             self.player_y = max(
                 0, min(self.player_y, SCREEN_HEIGHT - self.player_height)
             )
+            
+            # 移動しっぱなしモードで壁に到達したら停止する
+            if self.is_continuous_move_mode_on:
+                if self.player_x <= 0 or self.player_x >= SCREEN_WIDTH - self.player_width:
+                    self.continuous_move_dx = 0
+                if self.player_y <= 0 or self.player_y >= SCREEN_HEIGHT - self.player_height:
+                    self.continuous_move_dy = 0
 
             # スペースキーで銃弾発射
-            if pyxel.btn(pyxel.KEY_SPACE) and pyxel.frame_count >= self.last_shot_frame + self.shot_cooldown_frames:
+            if pyxel.btn(pyxel.KEY_SPACE) and pyxel.frame_count >= self.last_shot_frame + (self.shot_cooldown_frames / self.player_fire_rate_multiplier):
                 self.last_shot_frame = pyxel.frame_count # 発射時刻を更新
                 if self.has_auto_aim_bullet:
                     # 自動追尾弾アビリティがある場合、HomingBulletを発射
@@ -594,7 +651,7 @@ class App:
                         if enemy.hp <= 0:
                             enemy.is_active = False
                             # 経験値オーブの生成ロジックを変更
-                            exp_value = ENEMY_EXP
+                            exp_value = ENEMY_EXP * enemy.phase
                             exp_color = NORMAL_EXP_ORB_COLOR
                             if random.random() < BIG_EXP_ORB_CHANCE: # BIG_EXP_ORB_CHANCEの確率で
                                 exp_value *= BIG_EXP_ORB_MULTIPLIER
@@ -617,7 +674,7 @@ class App:
                 if enemy.is_active and enemy.hp <= 0:
                     enemy.is_active = False
                     # 経験値オーブの生成ロジックを変更
-                    exp_value = ENEMY_EXP
+                    exp_value = ENEMY_EXP * enemy.phase
                     exp_color = NORMAL_EXP_ORB_COLOR
                     if random.random() < BIG_EXP_ORB_CHANCE: # BIG_EXP_ORB_CHANCEの確率で
                         exp_value *= BIG_EXP_ORB_MULTIPLIER
@@ -697,9 +754,9 @@ class App:
                     self.current_ability_selection_index + 1
                 ) % len(self.selected_abilities_for_level_up)
 
-            if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(
+            if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(
                 pyxel.KEY_Z
-            ):  # スペースキーまたはZキーで決定
+            ):  # エンターキーまたはZキーで決定
                 chosen_ability = self.selected_abilities_for_level_up[
                     self.current_ability_selection_index
                 ]
@@ -825,7 +882,7 @@ class App:
 
                 pyxel.text(display_x, start_y + i * 20, display_text, text_color)
 
-            confirm_text = "Press SPACE/Z to select"
+            confirm_text = "Press ENTER/Z to select"
             # 確認メッセージも中央より少し左に寄せるでやんす
             pyxel.text(
                 SCREEN_WIDTH // 2 - len(confirm_text) * pyxel.FONT_WIDTH / 2,
