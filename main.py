@@ -1,5 +1,6 @@
 import math
 import random
+import sys # sysモジュールをインポート
 
 import pyxel
 
@@ -113,6 +114,18 @@ class PiercingShotAbility(Ability):
         player.has_piercing_shot = True
         player.pierce_level += 1 # 貫通レベルを上げるでやんす (最初は1、次は2と増える)
 
+class SummonGhostAbility(Ability):
+    def __init__(self):
+        super().__init__(
+            "Summon Ghost", "Summons a ghost that fights for you.", max_level=1 # max_levelを1に設定
+        )
+
+    def apply_effect(self, player):
+        player.has_ghost_summon = True
+        # 最初のゴーストを召喚 (player_x, player_yはプレイヤーの初期位置、BULLET_DAMAGEは現在の弾丸ダメージ)
+        player.ghosts.append(Ghost(player.player_x, player.player_y, player.bullet_damage))
+
+
 # 全てのアビリティのリスト
 ALL_ABILITIES = [
     MaxHpUp(),
@@ -120,7 +133,8 @@ ALL_ABILITIES = [
     BulletSpeedUp(),
     BulletDamageUp(),
     AutoAimBulletAbility(),
-    PiercingShotAbility(), # 新しいアビリティを追加
+    PiercingShotAbility(),
+    SummonGhostAbility(), # 新しいアビリティを追加
 ]
 
 
@@ -264,6 +278,85 @@ class Enemy:
         if self.is_active:
             pyxel.rect(self.x, self.y, self.width, self.height, self.color)
 
+# ゴーストの攻撃レート (フレーム数)
+GHOST_ATTACK_INTERVAL = 30 # 1秒間に1回攻撃 (30FPS)
+GHOST_ATTACK_RANGE = 30 # ゴーストの攻撃範囲
+GHOST_ATTACK_EFFECT_DURATION = 5 # ゴーストが攻撃時に色が変わるフレーム数
+
+class Ghost:
+    def __init__(self, player_x, player_y, initial_player_bullet_damage):
+        self.x = player_x
+        self.y = player_y
+        self.width = 6 # サイズを小さくする
+        self.height = 6 # サイズを小さくする
+        self.original_color = 7 # 白色
+        self.attack_color = 8 # 赤色 (攻撃時に変わる色)
+        self.color = self.original_color
+        self.is_active = True
+        self.target_offset_x = random.uniform(-20, 20) # プレイヤーの周りをふわふわするためのオフセット
+        self.target_offset_y = random.uniform(-20, 20)
+        self.speed = 0.8 # プレイヤー追従速度
+        
+        self.base_attack_damage = initial_player_bullet_damage * 2.0 # プレイヤー弾丸ダメージの200% (2倍)
+        self.current_attack_damage = self.base_attack_damage
+        self.attack_timer = 0
+        self.attack_interval = GHOST_ATTACK_INTERVAL
+        self.attack_effect_timer = 0 # 攻撃エフェクト用タイマー
+
+
+    def update(self, player_x, player_y, player_level, enemies):
+        if not self.is_active:
+            return
+
+        # プレイヤーレベルに応じて攻撃力強化
+        # プレイヤーレベルが1上がるごとに1.1倍に強化される
+        self.current_attack_damage = self.base_attack_damage * (1.1 ** (player_level - 1))
+
+
+        # プレイヤーの周りを追従
+        target_x = player_x + self.target_offset_x
+        target_y = player_y + self.target_offset_y
+        
+        angle = math.atan2(target_y - self.y, target_x - self.x)
+        self.x += self.speed * math.cos(angle)
+        self.y += self.speed * math.sin(angle)
+
+        # 攻撃エフェクトタイマーの更新
+        if self.attack_effect_timer > 0:
+            self.attack_effect_timer -= 1
+            if self.attack_effect_timer == 0:
+                self.color = self.original_color # エフェクト終了で元の色に戻す
+
+        # 攻撃ロジック
+        self.attack_timer += 1
+        if self.attack_timer >= self.attack_interval:
+            self.attack_timer = 0
+            
+            # 攻撃範囲内の最も近い敵を探す
+            closest_enemy = None
+            min_dist = GHOST_ATTACK_RANGE
+            for enemy in enemies:
+                if enemy.is_active:
+                    dist = math.hypot(self.x - enemy.x, self.y - enemy.y)
+                    if dist < min_dist:
+                        min_dist = dist
+                        closest_enemy = enemy
+            
+            if closest_enemy:
+                # 敵にダメージを与える
+                closest_enemy.hp -= self.current_attack_damage
+                # 攻撃エフェクトを開始
+                self.color = self.attack_color
+                self.attack_effect_timer = GHOST_ATTACK_EFFECT_DURATION
+                # 敵が倒れたかどうかのチェックと経験値オーブの生成はAppクラス側で行うでやんす
+                # Appクラスのupdateメソッドで、全ての敵のhpをチェックして、0以下ならexp_orbを生成する
+                # という処理を入れれば良いでやんす。
+
+    def draw(self):
+        if self.is_active:
+            # 今回は単純に白い四角で表現するでやんす
+            pyxel.rect(self.x, self.y, self.width, self.height, self.color)
+
 
 class ExperienceOrb:
     def __init__(self, x, y, value, color=NORMAL_EXP_ORB_COLOR): # color引数を追加
@@ -291,6 +384,15 @@ class ExperienceOrb:
 class App:
     def __init__(self):
         pyxel.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="Vampire Survivors-like")
+
+        self.debug_abilities = []
+        if len(sys.argv) > 1:
+            # コマンドライン引数からデバッグ用アビリティを取得
+            # 例: uv run main.py --piercing_shot --summon_ghost
+            for arg in sys.argv[1:]:
+                if arg.startswith('--'):
+                    self.debug_abilities.append(arg[2:].replace('_', ' ').title())
+
 
         self.reset_game_state()
 
@@ -356,6 +458,19 @@ class App:
         self.has_piercing_shot = False # 貫通弾アビリティを持っているか
         self.pierce_level = 0 # 貫通レベル (貫通できる敵の数 + 1)
         self.acquired_ability_levels = {} # 取得済みアビリティのレベルを記録する辞書
+        self.has_ghost_summon = False # ゴースト召喚アビリティを持っているか
+        self.ghosts = [] # 召喚されたゴーストオブジェクトを保持するリスト
+
+        # デバッグ用アビリティの適用
+        for debug_ability_name in self.debug_abilities:
+            for ability in ALL_ABILITIES:
+                if ability.name == debug_ability_name:
+                    ability.apply_effect(self)
+                    # 取得済みアビリティレベルを更新
+                    self.acquired_ability_levels[ability.name] = \
+                        self.acquired_ability_levels.get(ability.name, 0) + 1
+                    break
+
 
 
 
@@ -432,6 +547,8 @@ class App:
                 enemy.update(self.player_x, self.player_y)
             for orb in self.exp_orbs:
                 orb.update()
+            for ghost in self.ghosts: # ゴーストの更新
+                ghost.update(self.player_x, self.player_y, self.player_level, self.enemies)
 
             # ゲーム時間に応じてフェーズを更新
             if pyxel.frame_count > 0 and pyxel.frame_count % 1800 == 0: # 1分 (30FPS * 60秒 = 1800フレーム) ごとにフェーズ更新
@@ -493,6 +610,21 @@ class App:
                                 bullet.is_active = False # 貫通回数を超えたら弾を非アクティブにする
                         else:
                             bullet.is_active = False # 貫通能力がなければ1体ヒットで非アクティブ
+
+            # ここで全ての敵のHPをチェックし、倒れた敵を処理するでやんす
+            # 銃弾、ゴーストどちらの攻撃でもここを通るようにするでやんす
+            for enemy in self.enemies:
+                if enemy.is_active and enemy.hp <= 0:
+                    enemy.is_active = False
+                    # 経験値オーブの生成ロジックを変更
+                    exp_value = ENEMY_EXP
+                    exp_color = NORMAL_EXP_ORB_COLOR
+                    if random.random() < BIG_EXP_ORB_CHANCE: # BIG_EXP_ORB_CHANCEの確率で
+                        exp_value *= BIG_EXP_ORB_MULTIPLIER
+                        exp_color = BIG_EXP_ORB_COLOR
+                    self.exp_orbs.append(
+                        ExperienceOrb(enemy.x, enemy.y, exp_value, exp_color)
+                    )  # 経験値オーブをドロップ (色も渡す)
 
             # プレイヤーと敵の衝突判定
             if not self.is_invincible:
@@ -593,6 +725,8 @@ class App:
                 bullet.draw()
             for enemy in self.enemies:
                 enemy.draw()
+            for ghost in self.ghosts: # ゴーストの描画
+                ghost.draw()
 
             # プレイヤーの描画 (無敵時間中は点滅)
             if self.is_invincible:
