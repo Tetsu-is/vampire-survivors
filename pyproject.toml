@@ -4,3 +4,11 @@ version = "0.1.0"
 dependencies = [
     "pyxel>=2.6.3",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint] # lintセクションを追加
+select = ["E", "F", "W", "I", "N", "D"]
+ignore = ["D100", "D101", "D102", "D103", "D104", "D107"]
